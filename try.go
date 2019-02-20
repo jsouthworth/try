@@ -8,47 +8,54 @@ import (
 	"jsouthworth.net/go/dyn"
 )
 
-func Try(
-	fn interface{},
-	handlers ...exceptionHandler,
-) (out interface{}, err error) {
+func New(handlers ...exceptionHandler) func(fn interface{}) (interface{}, error) {
 	hs := exceptionHandlers{
 		handlers: make(map[reflect.Type]interface{}),
 	}
 	for _, handler := range handlers {
 		handler(&hs)
 	}
-	defer func(finally interface{}) {
-		if finally != nil {
-			got, ferr := Try(finally)
-			if out == nil {
-				out = got
+	return func(fn interface{}) (out interface{}, err error) {
+		defer func(finally interface{}) {
+			if finally != nil {
+				got, ferr := Try(finally)
+				if out == nil {
+					out = got
+				}
+				if err == nil {
+					err = ferr
+				}
 			}
-			if err == nil {
-				err = ferr
+		}(hs.finally)
+		defer func(hs *exceptionHandlers) {
+			r := recover()
+			if r == nil {
+				return
 			}
-		}
-	}(hs.finally)
-	defer func(hs *exceptionHandlers) {
-		r := recover()
-		if r == nil {
-			return
-		}
-		rt := reflect.TypeOf(r)
-		handler, ok := hs.handlers[rt]
-		if ok {
-			out, err = Try(dyn.Bind(handler, r))
-			return
-		}
-		switch v := r.(type) {
-		case error:
-			err = v
-		default:
-			err = fmt.Errorf("%v", v)
-		}
-	}(&hs)
-	out = dyn.Apply(fn)
-	return
+			rt := reflect.TypeOf(r)
+			handler, ok := hs.handlers[rt]
+			if ok {
+				out, err = Try(dyn.Bind(handler, r))
+				return
+			}
+			switch v := r.(type) {
+			case error:
+				err = v
+			default:
+				err = fmt.Errorf("%v", v)
+			}
+		}(&hs)
+		out = dyn.Apply(fn)
+		return
+	}
+}
+
+func Try(
+	fn interface{},
+	handlers ...exceptionHandler,
+) (out interface{}, err error) {
+	try := New(handlers...)
+	return try(fn)
 }
 
 func Catch(fn interface{}) exceptionHandler {
