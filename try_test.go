@@ -85,6 +85,16 @@ func ExampleTry_origErrorPreserved() {
 	// Output: dyn.ErrDoesNotUnderstand
 }
 
+func ExampleApply() {
+	square := func(x int) int {
+		return x * x
+	}
+	fmt.Println(Apply(square, "foo"))
+	fmt.Println(Apply(square, 10))
+	// Output: <nil> reflect: Call using string as type int
+	// 100 <nil>
+}
+
 type receiver struct {
 }
 

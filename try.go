@@ -67,6 +67,26 @@ func Try(
 	return New(handlers...)(fn)
 }
 
+// Apply provides a simple interface for calling arbitrary functions,
+// recovering from any panic, and finally returning the output and any
+// error that occured.
+func Apply(fn interface{}, args ...interface{}) (out interface{}, err error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		switch v := r.(type) {
+		case error:
+			err = v
+		default:
+			err = fmt.Errorf("%v", v)
+		}
+	}()
+	out = dyn.Apply(fn, args...)
+	return
+}
+
 // Catch defines an exception handler. Fn must be a function of one
 // argument. If multiple handlers with the same type are registered, the
 // last one defined will be used.
