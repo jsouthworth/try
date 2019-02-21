@@ -21,7 +21,12 @@ func ExampleTry_catch() {
 
 func ExampleTry_finally() {
 	out, err := Try(dyn.Bind(func(x int) int { panic("help!") }, 10),
-		Finally(func() string { return "Finally" }))
+		Finally(func(in interface{}) interface{} {
+			if in == nil {
+				return "Finally"
+			}
+			return in
+		}))
 	fmt.Println(out, err)
 	// Output: Finally help!
 }
@@ -29,7 +34,10 @@ func ExampleTry_finally() {
 func ExampleTry_catchFinally() {
 	out, err := Try(dyn.Bind(func(x int) int { panic("help!") }, 10),
 		Catch(func(s string) string { return s }),
-		Finally(func() { fmt.Println("Finally") }))
+		Finally(func(in string) string {
+			fmt.Println("Finally")
+			return in
+		}))
 	fmt.Println(out, err)
 	// Output: Finally
 	// help! <nil>
@@ -38,7 +46,9 @@ func ExampleTry_catchFinally() {
 func ExampleTry_catchFinallyNoResult() {
 	out, err := Try(dyn.Bind(func(x int) int { panic("help!") }, 10),
 		Catch(func(s string) {}),
-		Finally(func() string { return "Finally" }))
+		Finally(func(in interface{}) string {
+			return "Finally"
+		}))
 	fmt.Println(out, err)
 	// Output: Finally <nil>
 }
@@ -46,7 +56,12 @@ func ExampleTry_catchFinallyNoResult() {
 func ExampleTry_noError() {
 	out, err := Try(dyn.Bind(func(x int) int { return x }, 10),
 		Catch(func(s string) interface{} { return nil }),
-		Finally(func() string { return "Finally" }))
+		Finally(func(in interface{}) interface{} {
+			if in != nil {
+				return in
+			}
+			return "Finally"
+		}))
 	fmt.Println(out, err)
 	// Output: 10 <nil>
 }

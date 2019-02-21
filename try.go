@@ -1,4 +1,13 @@
-// Package try is a Try/Catch language extension
+// Package try is a Try/Catch implementation. A common pattern when
+// needing to protect a section of code from panics, such as calling
+// plugins or passing errors from deep in a recursive tree, is to use
+// defer func() { recover() ... }() this is more or less the try catch
+// pattern from other languages. This implementation generalizes that
+// pattern and makes it easier to use. Unlike other languages, this turns
+// a call into a value and a go error. Any caught value is transformed to
+// an error. If it is already an error then it is passed along as is,
+// otherwise fmt.Errorf is used to create an error. If one panics within
+// an exeception this will become the returned error.
 package try
 
 import (
@@ -8,6 +17,7 @@ import (
 	"jsouthworth.net/go/dyn"
 )
 
+// New builds a new try/catch context out of the provided exception handlers.
 func New(handlers ...exceptionHandler) func(fn interface{}) (interface{}, error) {
 	hs := exceptionHandlers{
 		handlers: make(map[reflect.Type]interface{}),
@@ -18,10 +28,8 @@ func New(handlers ...exceptionHandler) func(fn interface{}) (interface{}, error)
 	return func(fn interface{}) (out interface{}, err error) {
 		defer func(finally interface{}) {
 			if finally != nil {
-				got, ferr := Try(finally)
-				if out == nil {
-					out = got
-				}
+				got, ferr := Try(dyn.Bind(finally, out))
+				out = got
 				if err == nil {
 					err = ferr
 				}
@@ -50,14 +58,18 @@ func New(handlers ...exceptionHandler) func(fn interface{}) (interface{}, error)
 	}
 }
 
+// Try builds a context from the try/catch handlers and then calls the
+// provided function in that context.
 func Try(
 	fn interface{},
 	handlers ...exceptionHandler,
 ) (out interface{}, err error) {
-	try := New(handlers...)
-	return try(fn)
+	return New(handlers...)(fn)
 }
 
+// Catch defines an exception handler. Fn must be a function of one
+// argument. If multiple handlers with the same type are registered, the
+// last one defined will be used.
 func Catch(fn interface{}) exceptionHandler {
 	return func(hs *exceptionHandlers) {
 		fnt := reflect.TypeOf(fn)
@@ -71,6 +83,11 @@ func Catch(fn interface{}) exceptionHandler {
 	}
 }
 
+// Finally defines what should happen after every call but before
+// returning the value, error pair. This gives one final place to return
+// a value regardless of the error condition. fn is a function of the type
+// fn(cur rT, err error) fT where rT is the return type of the
+// function/handlers and fT is the return type of finally.
 func Finally(fn interface{}) exceptionHandler {
 	return func(hs *exceptionHandlers) {
 		hs.finally = fn
